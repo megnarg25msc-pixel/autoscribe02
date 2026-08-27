@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoScribe Local Voice Engine - Browser Test Client</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --accent: #38bdf8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #334155;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      margin: 0 0 0.5rem 0;
+      color: var(--accent);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .status-badge.connected {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .status-badge.disconnected {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.25rem;
+      color: var(--accent);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      flex: 1;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      border: none;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: #0284c7;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #0369a1;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .output-box {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 3rem;
+    }
+
+    .meta-tag {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+    }
+
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .chip {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>AutoScribe Voice Engine Test Client</h1>
+      <p>Local `faster-whisper` Browser Integration Pipeline (Config C)</p>
+      <div id="statusBadge" class="status-badge">Checking Server...</div>
+    </div>
+
+    <!-- Dictation Controls Card -->
+    <div class="card">
+      <h2>Microphone Input</h2>
+      <div class="btn-group">
+        <button id="startBtn" class="btn-primary">🎤 Start Dictation</button>
+        <button id="stopBtn" class="btn-danger" disabled>⏹️ Stop Dictation</button>
+        <button id="clearBtn" class="btn-secondary">🧹 Clear Buffer</button>
+      </div>
+      <div id="recStatus" style="font-size: 0.9rem; color: #94a3b8;">
+        Click 'Start Dictation' and speak into your microphone.
+      </div>
+    </div>
+
+    <!-- Presets for Testing -->
+    <div class="card">
+      <h2>Recommended Test Sentences</h2>
+      <div class="presets">
+        <div class="chip">1. "The capital of India is New Delhi."</div>
+        <div class="chip">2. "Photosynthesis is the process by which green plants prepare their food."</div>
+        <div class="chip">3. "Newton's second law of motion."</div>
+        <div class="chip">4. "x cubed plus three equals ten."</div>
+      </div>
+    </div>
+
+    <!-- Outputs -->
+    <div class="card">
+      <h2>Latest Raw Segment Transcript</h2>
+      <div id="rawOutput" class="output-box">(Waiting for microphone input...)</div>
+    </div>
+
+    <div class="card">
+      <h2>Math Normalized Output (Optional Utility)</h2>
+      <div id="mathOutput" class="output-box">(Will convert 'x cubed plus 3 equals 10' -> 'x³+3=10')</div>
+    </div>
+
+    <div class="card">
+      <h2>Cumulative Transcript Buffer</h2>
+      <div id="cumulativeOutput" class="output-box">(Speech history will accumulate here across pauses)</div>
+      <div id="metaInfo" class="meta-tag">Latency: -</div>
+    </div>
+  </div>
+
+  <script>
+    const SERVER_URL = "http://127.0.0.1:5000";
+    let audioContext = null;
+    let mediaStream = null;
+    let scriptProcessor = null;
+    let gainNode = null;
+    let pcmSamples = [];
+
+    const statusBadge = document.getElementById("statusBadge");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const recStatus = document.getElementById("recStatus");
+    const rawOutput = document.getElementById("rawOutput");
+    const mathOutput = document.getElementById("mathOutput");
+    const cumulativeOutput = document.getElementById("cumulativeOutput");
+    const metaInfo = document.getElementById("metaInfo");
+
+    // Math Normalization matching voice_engine.py
+    function normalizeMath(text) {
+      if (!text) return "";
+      let t = text.toLowerCase().trim();
+
+      const replacements = [
+        ["greater than or equal to", "≥"],
+        ["less than or equal to", "≤"],
+        ["divided by", "÷"],
+        ["multiplied by", "×"],
+        ["open bracket", "("],
+        ["close bracket", ")"],
+        ["is equal to", "="],
+        ["equal to", "="],
+        ["equals", "="],
+        ["greater than", ">"],
+        ["less than", "<"],
+        ["plus", "+"],
+        ["minus", "-"],
+        ["times", "×"]
+      ];
+
+      replacements.forEach(([spoken, sym]) => {
+        t = t.replaceAll(spoken, ` ${sym} `);
+      });
+
+      t = t.replace(/\b(squared|square)\b/g, "²");
+      t = t.replace(/\b(cubed|cube)\b/g, "³");
+
+      const numMap = {
+        "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+        "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10"
+      };
+
+      t = t.split(/\s+/).map(w => numMap[w] || w).join(" ");
+      t = t.replace(/\s*([+×÷=><≤≥-])\s*/g, "$1");
+      t = t.replace(/(\d+)\s+x\b/g, "$1x");
+      t = t.replace(/\bx\s+([²³])/g, "x$1");
+      return t.replace(/\s+/g, " ").trim();
+    }
+
+    // Health Check
+    async function checkHealth() {
+      try {
+        const res = await fetch(`${SERVER_URL}/health`);
+        const data = await res.json();
+        if (data.status === "ok") {
+          statusBadge.textContent = `Connected: ${data.engine} (${data.model})`;
+          statusBadge.className = "status-badge connected";
+        } else {
+          throw new Error("Invalid response");
+        }
+      } catch (err) {
+        statusBadge.textContent = "Server Offline (Run local_voice_server.py)";
+        statusBadge.className = "status-badge disconnected";
+      }
+    }
+
+    checkHealth();
+    setInterval(checkHealth, 5000);
+
+    // 16kHz 16-bit Mono WAV PCM Encoder
+    function encodeWAV(samples, sampleRate = 16000) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+
+      function writeString(offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM
+      view.setUint16(22, 1, true); // Mono
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+    }
+
+    // Recording Controls (Isolated single cycle, zero speaker feedback)
+    startBtn.onclick = async () => {
+      try {
+        // Reset PCM samples buffer completely for new single recording session
+        pcmSamples = [];
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = 0; // ZERO GAIN: Mute speaker playback to prevent audio feedback loop!
+
+        scriptProcessor.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          pcmSamples.push(new Float32Array(inputData));
+        };
+
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        recStatus.textContent = "🔴 Recording 16kHz Mono WAV (Diagnostic Mode)... Speak now!";
+        recStatus.style.color = "#ef4444";
+      } catch (err) {
+        alert(`Microphone permission denied or unavailable: ${err.message}`);
+      }
+    };
+
+    stopBtn.onclick = async () => {
+      // Disconnect and stop media resources cleanly
+      if (scriptProcessor) {
+        scriptProcessor.disconnect();
+        scriptProcessor.onaudioprocess = null;
+      }
+      if (gainNode) gainNode.disconnect();
+      if (audioContext) audioContext.close();
+      if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+
+      recStatus.textContent = "Encoding 16kHz WAV and sending to local server...";
+      recStatus.style.color = "#f59e0b";
+
+      // Combine samples into single WAV
+      let totalLength = pcmSamples.reduce((acc, arr) => acc + arr.length, 0);
+      let samples = new Float32Array(totalLength);
+      let offset = 0;
+      for (let arr of pcmSamples) {
+        samples.set(arr, offset);
+        offset += arr.length;
+      }
+
+      const audioBlob = encodeWAV(samples, 16000);
+      const startTime = performance.now();
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.wav");
+
+      try {
+        const response = await fetch(`${SERVER_URL}/transcribe`, {
+          method: "POST",
+          body: formData
+        });
+
+        const result = await response.json();
+        const elapsedSec = ((performance.now() - startTime) / 1000).toFixed(3);
+
+        if (result.success && result.transcript) {
+          const rawText = result.transcript.trim();
+          const mathText = normalizeMath(rawText);
+
+          // DIAGNOSTIC MODE: Display ONLY current recording transcript (cumulative buffer disabled)
+          rawOutput.textContent = rawText;
+          mathOutput.textContent = mathText;
+          cumulativeOutput.textContent = rawText; // Display current phrase only
+
+          metaInfo.textContent = `Diagnostic File: ${result.saved_file || 'N/A'} | Latency: ${elapsedSec}s | Duration: ${result.audio_duration_sec}s | Format: ${result.audio_format} | Processing: ${result.processing_time_sec}s`;
+          recStatus.textContent = "Diagnostic Transcription Complete!";
+          recStatus.style.color = "#22c55e";
+        } else {
+          rawOutput.textContent = "(No speech recognized)";
+          mathOutput.textContent = "(No speech recognized)";
+          cumulativeOutput.textContent = "(No speech recognized)";
+          recStatus.textContent = "No speech recognized or empty input.";
+          recStatus.style.color = "#94a3b8";
+        }
+      } catch (err) {
+        recStatus.textContent = `Error: ${err.message}`;
+        recStatus.style.color = "#ef4444";
+      }
+    };
+
+    clearBtn.onclick = () => {
+      rawOutput.textContent = "(Cleared)";
+      mathOutput.textContent = "(Cleared)";
+      cumulativeOutput.textContent = "(Cleared)";
+      metaInfo.textContent = "Latency: -";
+    };
+  </script>
+</body>
+</html>
